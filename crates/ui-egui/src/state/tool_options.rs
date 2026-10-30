@@ -89,6 +89,8 @@ pub struct ToolOptions {
     pub finger_painting: bool,
     /// Quick Selection enhance edge.
     pub enhance_edge: bool,
+    /// Brush selection only: 0 new, 1 add, 2 subtract.
+    pub quick_selection_mode: u8,
     /// Pen: "path" (work path) or "shape" (shape layer).
     pub vector_mode: String,
     /// Pen, Freeform Pen and Curvature Pen › Path Operations (#1397): how a new path combines with
@@ -413,6 +415,7 @@ impl Default for ToolOptions {
             protect_detail: true,
             finger_painting: false,
             enhance_edge: false,
+            quick_selection_mode: 1,
             vector_mode: "path".into(),
             pen_path_op: default_pen_path_op(),
             shape_fill: true,

@@ -833,3 +833,18 @@ fn art_history_stroke_runs_the_command() {
     drag(&mut app, Tool::ArtHistoryBrush);
     assert_eq!(app.session.journal.last().map(|(id, _)| id.as_str()), Some("paint.artHistoryBrush"));
 }
+
+#[test]
+fn quick_selection_toolbar_modes_and_modifiers_agree() {
+    let none = egui::Modifiers::NONE;
+    for (mode, expected) in [(0, "replace"), (1, "add"), (2, "subtract")] {
+        assert_eq!(quick_selection_mode(mode, none), expected);
+        assert_eq!(quick_selection_mode(mode, egui::Modifiers { alt: true, ..none }), "subtract");
+        assert_eq!(quick_selection_mode(mode, egui::Modifiers { shift: true, ..none }), "add");
+    }
+    let mut app = app();
+    app.ui.selection_mode = 3;
+    app.ui.tool_options.quick_selection_mode = 2;
+    assert_eq!(crate::tool_feedback::document_selection_mode(&app, Tool::QuickSelection, none), "subtract");
+    assert_eq!(crate::tool_feedback::document_selection_mode(&app, Tool::Lasso, none), "intersect");
+}

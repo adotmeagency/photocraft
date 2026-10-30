@@ -13,7 +13,7 @@
 pub const UPDATE_APP: craft_update::app::App = craft_update::app::App {
     icon_png: Some(include_bytes!("../../../assets/app-icon/hicolor/128x128/apps/ai.storyteller.photocraft.png")),
     accent: Some([0x2f, 0x7b, 0xf5]),
-    ..craft_update::suite::PHOTOCRAFT
+    ..craft_update::app::App::new("photocraft", "PhotoStudio", "Creative tools", "adotmeagency/photocraft")
 };
 
 /// Translate a string literal into the current UI language: `tl!("Image Size…")`.

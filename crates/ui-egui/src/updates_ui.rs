@@ -30,7 +30,7 @@ fn release_of(found: &photocraft_engine::updates_cmds::Release) -> craft_update:
     craft_update::Release {
         tag: format!("v{}", found.version),
         version: craft_update::parse_version(&found.version),
-        name: format!("PhotoCraft {}", found.version),
+        name: format!("PhotoStudio {}", found.version),
         html_url: found.url.clone(),
         ..Default::default()
     }
@@ -67,12 +67,8 @@ pub(crate) fn tick(app: &mut PhotocraftApp, ctx: &egui::Context) {
     if app.session.updates.check.is_none() {
         return;
     }
-    if !app.updates_rt.startup_checked {
-        app.updates_rt.startup_checked = true;
-        if app.session.prefs().general.automatically_check_updates && matches!(app.session.updates.status, Status::Idle) {
-            let _ = app.run("help.checkForUpdates", serde_json::json!({}));
-        }
-    }
+    // Fork releases are checked explicitly from Help, keeping launch free of network work.
+    app.updates_rt.startup_checked = true;
     if matches!(app.session.updates.status, Status::Checking) {
         ctx.request_repaint_after(std::time::Duration::from_millis(100));
     }
@@ -111,7 +107,7 @@ pub(crate) fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
     let mut open = true;
     let status = app.session.updates.status.clone();
     let mut retry = false;
-    egui::Window::new(tl!("PhotoCraft Updates"))
+    egui::Window::new(tl!("PhotoStudio Updates"))
         .id(egui::Id::unique("photocraft_updates"))
         .open(&mut open)
         .collapsible(false)
@@ -129,7 +125,7 @@ pub(crate) fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
                     });
                 }
                 Status::Available { release } => {
-                    ui.label(crate::i18n::fmt(crate::i18n::t("PhotoCraft {version} is available."), &[("version", &release.version)]));
+                    ui.label(crate::i18n::fmt(crate::i18n::t("PhotoStudio {version} is available."), &[("version", &release.version)]));
                     #[cfg(not(target_arch = "wasm32"))]
                     {
                         if crate::widgets::primary_button(ui, tl!("Update and Restart"), 180.0).clicked() {
@@ -145,7 +141,7 @@ pub(crate) fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
                     }
                 }
                 Status::UpToDate => {
-                    ui.label(tl!("PhotoCraft is up to date."));
+                    ui.label(tl!("PhotoStudio is up to date."));
                 }
                 Status::Failed { message } => {
                     ui.colored_label(t.warning, tl!("Could not check for updates."));
@@ -203,44 +199,15 @@ mod tests {
     }
 
     #[test]
-    fn automatic_check_runs_once_per_launch_even_after_days_or_preference_changes() {
-        let (mut app, calls, sender) = app();
+    fn startup_never_checks_even_with_legacy_automatic_preference() {
+        let (mut app, calls, _) = app();
         let ctx = egui::Context::default();
-        at(&mut app, &ctx, 0.0);
-        at(&mut app, &ctx, 1.0);
-        at(&mut app, &ctx, 2.0);
-        assert_eq!(*calls.lock().unwrap(), 1);
-        sender.lock().unwrap().as_ref().unwrap().send(Ok(None)).unwrap();
-        at(&mut app, &ctx, 3.0);
-        assert!(!app.ui.updates_open, "automatic up-to-date checks stay quiet");
-        at(&mut app, &ctx, 86400.0);
-        app.session.edit_prefs(|p| p.general.automatically_check_updates = false);
-        at(&mut app, &ctx, 86401.0);
         app.session.edit_prefs(|p| p.general.automatically_check_updates = true);
-        at(&mut app, &ctx, 172800.0);
-        assert_eq!(*calls.lock().unwrap(), 1, "no periodic checks or preference-triggered rechecks");
-        let (mut restarted, restarted_calls, _) = self::app();
-        at(&mut restarted, &ctx, 0.0);
-        assert_eq!(*restarted_calls.lock().unwrap(), 1, "the next launch checks again");
-    }
-
-    #[test]
-    fn startup_opt_out_and_failed_checks_do_not_retry_automatically() {
-        let (mut disabled, calls, _) = app();
-        let ctx = egui::Context::default();
-        disabled.session.edit_prefs(|p| p.general.automatically_check_updates = false);
-        at(&mut disabled, &ctx, 0.0);
-        disabled.session.edit_prefs(|p| p.general.automatically_check_updates = true);
-        at(&mut disabled, &ctx, 86400.0);
-        assert_eq!(*calls.lock().unwrap(), 0, "opt-out is evaluated at startup");
-
-        let (mut failed, calls, sender) = app();
-        at(&mut failed, &ctx, 0.0);
-        sender.lock().unwrap().as_ref().unwrap().send(Err("offline".into())).unwrap();
-        at(&mut failed, &ctx, 1.0);
-        at(&mut failed, &ctx, 172800.0);
-        assert_eq!(*calls.lock().unwrap(), 1);
-        assert!(!failed.ui.updates_open, "an automatic failure stays quiet");
+        for time in [0.0, 1.0, 86400.0] {
+            at(&mut app, &ctx, time);
+        }
+        assert_eq!(*calls.lock().unwrap(), 0);
+        assert!(!app.ui.updates_open);
     }
 
     #[test]
@@ -265,13 +232,14 @@ mod tests {
     fn available_release_notifies_once_even_when_automation_polls_first() {
         let (mut app, _, sender) = app();
         let ctx = egui::Context::default();
+        app.run("help.checkForUpdates", serde_json::json!({})).unwrap();
         at(&mut app, &ctx, 0.0);
         sender
             .lock()
             .unwrap()
             .as_ref()
             .unwrap()
-            .send(Ok(Some(Release { version: "99.0.0".into(), url: "https://github.com/storytold/photocraft/releases/tag/v99.0.0".into() })))
+            .send(Ok(Some(Release { version: "99.0.0".into(), url: "https://github.com/adotmeagency/photocraft/releases/tag/v99.0.0".into() })))
             .unwrap();
         app.run("updates.status", serde_json::json!({})).unwrap();
         at(&mut app, &ctx, 1.0);
@@ -283,16 +251,17 @@ mod tests {
 
     #[test]
     #[cfg(not(target_arch = "wasm32"))]
-    fn startup_update_prompt_appears_and_can_be_dismissed() {
+    fn manually_checked_update_prompt_appears_and_can_be_dismissed() {
         let (mut app, _, sender) = app();
         let ctx = egui::Context::default();
+        app.run("help.checkForUpdates", serde_json::json!({})).unwrap();
         at(&mut app, &ctx, 0.0);
         sender
             .lock()
             .unwrap()
             .as_ref()
             .unwrap()
-            .send(Ok(Some(Release { version: "99.0.0".into(), url: "https://github.com/storytold/photocraft/releases/tag/v99.0.0".into() })))
+            .send(Ok(Some(Release { version: "99.0.0".into(), url: "https://github.com/adotmeagency/photocraft/releases/tag/v99.0.0".into() })))
             .unwrap();
         at(&mut app, &ctx, 1.0);
         assert!(app.updates_rt.updater.prompt_open(), "startup prompt initialized on available release");
@@ -348,5 +317,16 @@ mod tests {
         assert!(app.ui.updates_open);
         assert_eq!(call(&mut app, "ui.set", serde_json::json!({"updatesOpen": false}))["ok"], true);
         assert!(!app.ui.updates_open);
+    }
+}
+
+#[cfg(test)]
+mod fork_startup_tests {
+    #[test]
+    fn startup_does_not_request_update_network_work() {
+        let mut app = crate::PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
+        let ctx = egui::Context::default();
+        super::tick(&mut app, &ctx);
+        assert!(!matches!(app.session.updates.status, photocraft_engine::updates_cmds::Status::Checking));
     }
 }

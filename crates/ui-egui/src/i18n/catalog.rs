@@ -64,6 +64,8 @@ impl Catalog {
     pub fn parse(text: &str) -> Catalog {
         let mut c = Catalog::default();
         for (ctx, src, tr) in parse_entries(text).0 {
+            let src = studio_names(&src);
+            let tr = studio_names(&tr);
             match ctx.as_str() {
                 "" => {
                     c.plain.insert(src, tr);
@@ -117,4 +119,9 @@ pub fn placeholders(s: &str) -> Vec<&str> {
         }
     }
     out
+}
+
+// Normalize once when loading a catalog; no replacement work in the frame loop.
+fn studio_names(text: &str) -> String {
+    text.replace("PhotoCraft", "PhotoStudio").replace("VectorCraft", "VectorStudio").replace("LightCraft", "LightStudio")
 }
