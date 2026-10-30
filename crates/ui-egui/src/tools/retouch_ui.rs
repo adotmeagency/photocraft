@@ -166,7 +166,7 @@ pub fn finish_stroke(app: &mut PhotocraftApp, tool: Tool, points: &[[f64; 3]], m
         },
         Tool::QuickSelection => {
             let size = app.session.tools.brush.size;
-            let mode = if mods.alt { "subtract" } else { "add" };
+            let mode = quick_selection_mode(o.quick_selection_mode, mods);
             let xy: Vec<[f64; 2]> = points.iter().map(|q| [q[0], q[1]]).collect();
             let (sample_all, enhance) = (o.sample_all.quick_selection, o.enhance_edge);
             let r = app.run("select.quick", json!({"points": xy, "size": size, "mode": mode, "enhanceEdge": enhance, "sampleAllLayers": sample_all}));
@@ -686,6 +686,12 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) -> bo
             opt(ui, tl!("Stylized dabs from a history state"));
         }
         Tool::QuickSelection => {
+            for (mode, icon, label) in [(0, "square", "New selection"), (1, "plus", "Add to selection"), (2, "minus", "Subtract from selection")] {
+                if crate::icons::button(ui, icon, 24.0, o.quick_selection_mode == mode, tl!(label)).clicked() {
+                    o.quick_selection_mode = mode;
+                }
+            }
+            crate::widgets::vline(ui, 22.0);
             crate::widgets::checkbox(ui, &mut o.sample_all.quick_selection, tl!("Sample All Layers"));
             crate::widgets::checkbox(ui, &mut o.enhance_edge, tl!("Enhance Edge"));
             opt(ui, &crate::i18n::fmt(tl!("{key} to subtract"), &[("key", &crate::shortcuts::pretty("Alt"))]));
@@ -744,3 +750,18 @@ fn pattern_stamp_options(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
 
 #[cfg(test)]
 mod tests;
+
+/// Brush-selection mode shared by the stroke and its cursor badge.
+pub(crate) fn quick_selection_mode(mode: u8, modifiers: egui::Modifiers) -> &'static str {
+    if modifiers.alt {
+        "subtract"
+    } else if modifiers.shift {
+        "add"
+    } else {
+        match mode {
+            0 => "replace",
+            2 => "subtract",
+            _ => "add",
+        }
+    }
+}

@@ -76,22 +76,22 @@ mod tests {
     #[test]
     fn only_a_macos_app_bundle_skips_the_runtime_icon() {
         use std::path::Path;
-        assert!(in_app_bundle(Path::new("/Applications/PhotoCraft.app/Contents/MacOS/photocraft")));
-        assert!(in_app_bundle(Path::new("/Users/a/Downloads/PhotoCraft Beta.APP/Contents/MacOS/photocraft")));
+        assert!(in_app_bundle(Path::new("/Applications/PhotoStudio.app/Contents/MacOS/photocraft")));
+        assert!(in_app_bundle(Path::new("/Users/a/Downloads/PhotoStudio Beta.APP/Contents/MacOS/photocraft")));
         assert!(!in_app_bundle(Path::new("/Users/a/src/photocraft/target/release/photocraft")));
         assert!(!in_app_bundle(Path::new("/opt/Contents/MacOS/photocraft")), "not inside a .app");
         assert!(!in_app_bundle(Path::new("/.app/Contents/MacOS/photocraft")), "a bare `.app` is no bundle name");
         assert!(!in_app_bundle(Path::new("photocraft")));
         assert!(sets_runtime_icon(None));
         assert!(sets_runtime_icon(Some(Path::new("/usr/bin/photocraft"))));
-        assert_eq!(sets_runtime_icon(Some(Path::new("/Applications/PhotoCraft.app/Contents/MacOS/photocraft"))), !cfg!(target_os = "macos"));
+        assert_eq!(sets_runtime_icon(Some(Path::new("/Applications/PhotoStudio.app/Contents/MacOS/photocraft"))), !cfg!(target_os = "macos"));
     }
 
     /// #7253: omitting `with_icon` made eframe paint its default glyph on the Dock once the window loaded.
     #[test]
     fn viewport_icon_blocks_eframe_default_when_runtime_icon_is_skipped() {
         use std::path::Path;
-        let bundled = Some(Path::new("/Applications/PhotoCraft.app/Contents/MacOS/photocraft"));
+        let bundled = Some(Path::new("/Applications/PhotoStudio.app/Contents/MacOS/photocraft"));
         if sets_runtime_icon(bundled) {
             let icon = viewport_icon(bundled);
             assert!(icon.width >= 256 && icon.width == icon.height);
@@ -109,13 +109,13 @@ mod tests {
     }
 
     #[test]
-    fn windows_and_linux_icons_keep_the_round_corners() {
-        // rx=112 of 512 leaves (10, 10) of a 256 px render transparent; the old crop filled it (#4478).
+    fn windows_and_linux_icons_keep_transparent_brand_padding() {
+        // The Adotme silhouette has transparent padding and an opaque center.
         let png = include_bytes!("../../../assets/app-icon/hicolor/256x256/apps/ai.storyteller.photocraft.png");
         let icon = eframe::icon_data::from_png_bytes(png).unwrap();
         assert_eq!(icon.width, 256);
         assert_eq!(icon.rgba[(10 * 256 + 10) * 4 + 3], 0, "corner is transparent");
-        assert_eq!(icon.rgba[(128 * 256 + 2) * 4 + 3], 255, "the tile is full bleed");
+        assert!(icon.rgba[(128 * 256 + 128) * 4 + 3] >= 250, "the mark center is opaque");
     }
 
     /// The `.ico` build.rs embeds: every size Windows asks for, each a valid PNG or BMP image.

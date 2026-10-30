@@ -82,3 +82,11 @@ mod tests {
         assert!(mark_rect(&ctx).is_some());
     }
 }
+
+pub fn heading(ui: &mut Ui, name: &str, color: Color32) {
+    ui.horizontal(|ui| {
+        let (rect, _) = ui.allocate_exact_size(egui::vec2(48.0, 48.0), egui::Sense::hover());
+        paint_mark(ui, rect);
+        ui.label(egui::RichText::new(name).size(38.0).strong().color(color));
+    });
+}
